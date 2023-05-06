@@ -39,6 +39,5 @@ def test(model):
         submission.to_csv('submission-fake.csv', index=False)
 
 if __name__ == '__main__':
-    
     model = torch.load(args.pretrained_model_path)
     test(model)
