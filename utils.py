@@ -17,7 +17,9 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=0.001)                  # learning rate, default:0.001, 
     parser.add_argument('--num_workers', type=int, default=4)               # number of workers, default: 4
     parser.add_argument('--cuda', action='store_true', default=True)    # disable cuda device, default: False
+
     return parser.parse_args()
+
 
 def confusion_matrix(calc_class, real_class):
 

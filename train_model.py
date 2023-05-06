@@ -12,8 +12,9 @@ import numpy as np
 
 from process_data import PlantsDataset
 from utils import parse_args, confusion_matrix
+from parameters.hyperparameters import HyperParameters
 
-args = parse_args() 
+args = parse_args()
 
 NUM_EPOCHS = args.epochs 
 BATCH_SIZE = args.batch_size
@@ -21,6 +22,33 @@ LR = args.lr
 NUM_WORKERS = args.num_workers
 TRAIN_PATH = './data/plant-seedlings-classification-cs429529/train'
 PRETRAINED_MODEL = args.pretrained_model_path
+
+# get and print parameters
+# hyperparameters = HyperParameters(args, TRAIN_PATH)
+
+args_get = False
+if args_get:
+    # from args
+    index_args = list(range(2))
+    input_args = [args, TRAIN_PATH]
+else:
+    # from custom values
+    pretrained_model_custom = f"model-0.92-best_train_acc.pth"
+    index_args = list(range(6))
+    input_args = [1, 64, 0.0005, 4, TRAIN_PATH, pretrained_model_custom]
+
+assert len(index_args) == len(input_args)
+dict_args = {}
+for index, input in zip(index_args, input_args):
+    dict_args[f"{index}"] = input
+
+hyperparameters = HyperParameters(args_get=args_get, **dict_args)
+hyperparameters.print_parameters()
+
+
+if __name__ == "__main__":
+    pass
+
 
 def load_plants_data():
     
@@ -50,8 +78,16 @@ def load_plant_validation_data():
          transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))]
     )
 
-    train_set = PlantsDataset(root_dir=Path(TRAIN_PATH), transform=data_transform,validation=True,tv_set='t',valid_count=50)
-    valid_set = PlantsDataset(root_dir=Path(TRAIN_PATH), transform=data_transform,validation=True,tv_set='v',valid_count=50)
+    train_set = PlantsDataset(root_dir=Path(TRAIN_PATH),
+                              transform=data_transform,
+                              validation=True,
+                              tv_set='t',
+                              valid_count=50)
+    valid_set = PlantsDataset(root_dir=Path(TRAIN_PATH),
+                              transform=data_transform,
+                              validation=True,
+                              tv_set='v',
+                              valid_count=50)
 
     data_loader = DataLoader(dataset=train_set, batch_size=BATCH_SIZE,
                              shuffle=True, **kwargs)
@@ -132,18 +168,23 @@ def train():
         print(f'Training loss: {training_loss:.4f}\t accuracy: {training_acc:.4f}\n')
 
         if training_acc > best_acc:
-            # Delete previous modelpa
+            # Delete previous model with similar accuracy
             if os.path.isfile(f'state_dict-{best_acc:.2f}-best_train_acc.pth'):
                 os.remove(f'state_dict-{best_acc:.2f}-best_train_acc.pth')
 
             best_acc = training_acc
             best_model_params = copy.deepcopy(model.state_dict())
 
+            print(f"Epoch {epoch + 1}/{NUM_EPOCHS}: saving model acc={best_acc:.02f}...")
             torch.save(model.state_dict(), f'state_dict-{best_acc:.2f}-best_train_acc.pth')
+        else:
+            print(f"Epoch {epoch + 1}/{NUM_EPOCHS}: lower acc, no save acc={training_acc}")
 
     model.load_state_dict(best_model_params)
 
+    print(f"FINAL saving model acc={best_acc:.02f}...")
     torch.save(model, f'model-{best_acc:.02f}-best_train_acc.pth')
+
     return model
 
 def train_valid():
@@ -246,5 +287,5 @@ def validate(model, device, valid_set, data_loader_valid):
     confusion_matrix(calc_class, real_class)
         #submission.to_csv('submission-fake.csv', index=False)
 
-if __name__ == '__main__':
-    train()
+# if __name__ == '__main__':
+#     train()
