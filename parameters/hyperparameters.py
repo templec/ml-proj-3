@@ -1,6 +1,6 @@
 class HyperParameters():
     def __init__(self, args_get=False, **kwargs):
-        self.pretrained_model = None
+        self.pretrained_model_path = None
         self.train_path = None
         self.num_workers = None
         self.lr = None
@@ -30,7 +30,7 @@ class HyperParameters():
         self.lr = args.lr
         self.num_workers = args.num_workers
         self.train_path = train_path
-        self.pretrained_model = args.pretrained_model_path
+        self.pretrained_model_path = args.pretrained_model_path
 
     def get_from_custom(self, **kwargs):
         # self, num_epochs,
@@ -52,7 +52,7 @@ class HyperParameters():
         self.lr = kwargs.get("2")
         self.num_workers = kwargs.get("3")
         self.train_path = kwargs.get("4")
-        self.pretrained_model = kwargs.get("5")
+        self.pretrained_model_path = kwargs.get("5")
 
     def print_parameters(self):
         print(f"num epochs: {self.num_epochs}")
@@ -60,4 +60,4 @@ class HyperParameters():
         print(f"learning rate: {self.lr}")
         print(f"num workers: {self.num_workers}")
         print(f"training path: {self.train_path}")
-        print(f"pretrained model path: {self.pretrained_model}")
+        print(f"pretrained model path: {self.pretrained_model_path}")

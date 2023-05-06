@@ -16,12 +16,7 @@ from parameters.hyperparameters import HyperParameters
 
 args = parse_args()
 
-NUM_EPOCHS = args.epochs 
-BATCH_SIZE = args.batch_size
-LR = args.lr                    
-NUM_WORKERS = args.num_workers
 TRAIN_PATH = './data/plant-seedlings-classification-cs429529/train'
-PRETRAINED_MODEL = args.pretrained_model_path
 
 # get and print parameters
 # hyperparameters = HyperParameters(args, TRAIN_PATH)
@@ -44,6 +39,18 @@ for index, input in zip(index_args, input_args):
 
 hyperparameters = HyperParameters(args_get=args_get, **dict_args)
 hyperparameters.print_parameters()
+
+# NUM_EPOCHS = args.epochs
+# BATCH_SIZE = args.batch_size
+# LR = args.lr
+# NUM_WORKERS = args.num_workers
+# PRETRAINED_MODEL = args.pretrained_model_path
+
+NUM_EPOCHS = hyperparameters.num_epochs
+BATCH_SIZE = hyperparameters.batch_size
+LR = hyperparameters.lr
+NUM_WORKERS = hyperparameters.num_workers
+PRETRAINED_MODEL = hyperparameters.pretrained_model_path
 
 
 if __name__ == "__main__":
