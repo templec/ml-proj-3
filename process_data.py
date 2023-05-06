@@ -35,7 +35,7 @@ class PlantsDataset(Dataset):
                         self.img.append(img)
                         self.idx.append(i)
 
-                print(self.idx)
+                #print(self.idx)
 
             else:
                 print('Warning: cannot find folder train')

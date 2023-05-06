@@ -34,7 +34,6 @@ def load_plants_data():
     )
 
     train_set = PlantsDataset(root_dir=Path(TRAIN_PATH), transform=data_transform)
-    print()
     data_loader = DataLoader(dataset=train_set, batch_size=BATCH_SIZE,
                              shuffle=True, **kwargs)
 
@@ -113,12 +112,11 @@ def train():
 
             # Method 2
             inputs, labels = inputs.to(device), labels.to(device)
-            #print("inputs: {}".format(inputs))
-            print("labels: {}".format(labels))
+            
             outputs = model(inputs)         # Resnet18 output
-            #print("outputs: {}".format(outputs))
+            
             _, preds = torch.max(outputs.data, 1)   
-            print("preds: {}".format(preds))
+            
             loss = criterion(outputs, labels)       
 
             optimizer.zero_grad() 
