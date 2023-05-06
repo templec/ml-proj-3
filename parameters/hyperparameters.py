@@ -1,11 +1,11 @@
 class HyperParameters():
     def __init__(self, args_get=False, **kwargs):
-        self.pretrained_model_path = None
-        self.train_path = None
-        self.num_workers = None
-        self.lr = None
-        self.batch_size = None
         self.num_epochs = None
+        self.batch_size = None
+        self.lr = None
+        self.num_workers = None
+        self.train_path = None
+        self.pretrained_model_path = None
 
         if args_get:
             self.get_from_args(**kwargs)

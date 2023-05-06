@@ -249,7 +249,6 @@ def train_valid(hyperparameters):
 
     train_set, valid_set, data_loader, data_loader_valid = load_plant_validation_data()
 
-    
     model = load_model(len(train_set))
     model.to(device)
     # model.cuda()        # by default will send your model to the "current device"
@@ -296,6 +295,9 @@ def train_valid(hyperparameters):
 
         print(f'Training loss: {training_loss:.4f}\t accuracy: {training_acc:.4f}\n')
 
+        # validation
+        validate(model, device, valid_set, data_loader_valid)
+
         if training_acc > best_acc:
             # Delete previous modelpa
             if os.path.isfile(f'state_dict-{best_acc:.2f}-best_train_acc.pth'):
@@ -308,13 +310,13 @@ def train_valid(hyperparameters):
             torch.save(model.state_dict(), f'state_dict-{best_acc:.2f}-best_train_acc_valid.pth')
 
     model.load_state_dict(best_model_params)
-    validate(model, device, valid_set, data_loader_valid)
+    validate_final(model, device, valid_set, data_loader_valid)
 
     print(f"FINAL saving model acc={best_acc:.02f}...")
     torch.save(model, f'model-{best_acc:.02f}-best_train_acc_valid.pth')
     return model
 
-def validate(model, device, valid_set, data_loader_valid):
+def validate_final(model, device, valid_set, data_loader_valid):
     model.eval()
 
     classes = [_dir.name for _dir in Path(TRAIN_PATH).glob('*')]
@@ -323,7 +325,7 @@ def validate(model, device, valid_set, data_loader_valid):
     
     with torch.no_grad():
         for i, (inputs, labels) in enumerate(tqdm(data_loader_valid)):
-            print(f"Testing...")
+            # print(f"Testing...")
             inputs, labels = inputs.to(device), labels.to(device)
             #print("inputs: {}".format(inputs))
             # print("labels of Valid set?: {}".format(labels))
@@ -344,5 +346,42 @@ def validate(model, device, valid_set, data_loader_valid):
     confusion_matrix(calc_class, real_class)
         #submission.to_csv('submission-fake.csv', index=False)
 
-# if __name__ == '__main__':
+
+def validate(model, device, valid_set, data_loader_valid):
+    model.eval()
+
+    classes = [_dir.name for _dir in Path(TRAIN_PATH).glob('*')]
+    real_class_lst = []
+    calc_class_lst = []
+
+    validation_loss = 0
+    validation_corrects = 0
+    criterion = nn.CrossEntropyLoss()
+
+    with torch.no_grad():
+        for i, (inputs, labels) in enumerate(tqdm(data_loader_valid)):
+            # print(f"Testing...")
+            inputs, labels = inputs.to(device), labels.to(device)
+            # print("inputs: {}".format(inputs))
+            # print("labels of Valid set?: {}".format(labels))
+            # real_class.append(labels.flatten().tolist())
+            real_class_lst += [j for j in labels.tolist()]
+            outputs = model(inputs)  # Resnet18 output
+            # print("outputs: {}".format(outputs))
+            _, preds = torch.max(outputs.data, 1)
+            # print("preds of valid Set?: {}".format(preds))
+            # calc_class.append(preds.tolist())
+            calc_class_lst += [j for j in preds.tolist()]
+
+            validation_corrects += (preds == labels.data).sum().item()
+
+            loss = criterion(outputs, labels)
+            validation_loss += loss.data * inputs.size(0)
+
+        validation_acc = validation_corrects / len(valid_set)
+
+        print(f'Validation loss: {validation_loss:.4f}\t accuracy: {validation_acc:.4f}\n')
+
+
+    # if __name__ == '__main__':
 #     train()

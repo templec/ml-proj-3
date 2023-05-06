@@ -31,7 +31,7 @@ def get_hyperparameters():
         # from custom values
         pretrained_model_custom = f"model-0.96-best_train_acc.pth"
         index_args = list(range(6))
-        input_args = [1, 64, 1, 4, TRAIN_PATH, pretrained_model_custom]
+        input_args = [1, 32, 0.0001, 4, TRAIN_PATH, pretrained_model_custom]
 
     assert len(index_args) == len(input_args)
     dict_args = {}
@@ -58,5 +58,5 @@ def get_hyperparameters():
 
 if __name__ == '__main__':
     hyperparameters = get_hyperparameters()
-    main(hyperparameters)
-    # main1(hyperparameters)
+    # main(hyperparameters)
+    main1(hyperparameters)
