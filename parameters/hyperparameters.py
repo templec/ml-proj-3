@@ -1,3 +1,6 @@
+from custom_enums import FileOption
+
+
 class HyperParameters():
     def __init__(self, args_get=False, **kwargs):
         self.num_epochs = None
@@ -6,11 +9,32 @@ class HyperParameters():
         self.num_workers = None
         self.train_path = None
         self.pretrained_model_path = None
+        self.save_every_num_epoch = None
+
+        self.accuracy_loss_dict = {}
 
         if args_get:
             self.get_from_args(**kwargs)
         else:
             self.get_from_custom(**kwargs)
+
+    def set_accuracy_loss_dict(self, file_option_list: list, file_option: FileOption):
+        self.accuracy_loss_dict[file_option] = file_option_list
+
+    def add_accuracy_loss_dict_value(self, file_option: FileOption, file_option_value):
+        self.accuracy_loss_dict[file_option].append(file_option_value)
+
+    def get_accuracy_loss_dict_list(self, file_option: FileOption):
+        return self.accuracy_loss_dict[file_option]
+
+    def print_accuracy_loss_dict(self):
+        print(f"---------------------------------------------------")
+        print(f"accuracy/loss of training and validation")
+
+        for file_option in FileOption:
+            print(f"{file_option.name}: {self.accuracy_loss_dict[file_option]}")
+
+        print(f"---------------------------------------------------")
 
     def get_from_args(self, **kwargs):
         # args, train_path
@@ -24,6 +48,7 @@ class HyperParameters():
 
         args = kwargs.get("0")
         train_path = kwargs.get("1")
+        save_every_num_epoch = kwargs.get("2")
 
         self.num_epochs = args.epochs
         self.batch_size = args.batch_size
@@ -31,6 +56,7 @@ class HyperParameters():
         self.num_workers = args.num_workers
         self.train_path = train_path
         self.pretrained_model_path = args.pretrained_model_path
+        self.save_every_num_epoch = save_every_num_epoch
 
     def get_from_custom(self, **kwargs):
         # self, num_epochs,
@@ -53,6 +79,7 @@ class HyperParameters():
         self.num_workers = kwargs.get("3")
         self.train_path = kwargs.get("4")
         self.pretrained_model_path = kwargs.get("5")
+        self.save_every_num_epoch = kwargs.get("6")
 
     def print_parameters(self):
         print(f"num epochs: {self.num_epochs}")

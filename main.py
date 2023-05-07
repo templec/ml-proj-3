@@ -1,5 +1,5 @@
 from parameters.hyperparameters import HyperParameters
-from train_model import train, train_valid
+from train_model import train, train_valid, get_model_filename
 from test_model import test
 from utils import parse_args
 
@@ -9,7 +9,7 @@ def main(hyperparameters):
     test(model)
 
 
-def main1(hyperparameters):
+def main_new(hyperparameters):
     model = train_valid(hyperparameters)
     test(model)
 
@@ -17,7 +17,8 @@ def main1(hyperparameters):
 def get_hyperparameters():
     args = parse_args()
 
-    TRAIN_PATH = './data/plant-seedlings-classification-cs429529/train'
+    train_path = './data/plant-seedlings-classification-cs429529/train'
+    save_every_num_epoch = 1
 
     # get and print parameters
     # hyperparameters = HyperParameters(args, TRAIN_PATH)
@@ -25,13 +26,16 @@ def get_hyperparameters():
     args_get = False
     if args_get:
         # from args
-        index_args = list(range(2))
-        input_args = [args, TRAIN_PATH]
+        input_args = [args, train_path, save_every_num_epoch]
+        index_args = list(range(len(input_args)))
     else:
         # from custom values
-        pretrained_model_custom = f"model-0.96-best_train_acc.pth"
-        index_args = list(range(6))
-        input_args = [1, 32, 0.0001, 4, TRAIN_PATH, pretrained_model_custom]
+        # pretrained_model_custom = f"model-0.96-best_train_acc.pth"
+        # pretrained_model_custom = f"state_dict-batch_size=32-lr=0.0001-0.59.pth"
+        pretrained_model_custom = None
+        # index_args = list(range(6))
+        input_args = [1, 32, 0.0001, 4, train_path, pretrained_model_custom, save_every_num_epoch]
+        index_args = list(range(len(input_args)))
 
     assert len(index_args) == len(input_args)
     dict_args = {}
@@ -39,6 +43,10 @@ def get_hyperparameters():
         dict_args[f"{index}"] = input
 
     hyperparameters = HyperParameters(args_get=args_get, **dict_args)
+
+    # acc = 0
+    # hyperparameters.pretrained_model_path = get_model_filename(acc)
+
     hyperparameters.print_parameters()
 
     # NUM_EPOCHS = args.epochs
@@ -59,4 +67,4 @@ def get_hyperparameters():
 if __name__ == '__main__':
     hyperparameters = get_hyperparameters()
     # main(hyperparameters)
-    main1(hyperparameters)
+    main_new(hyperparameters)

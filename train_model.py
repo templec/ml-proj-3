@@ -1,3 +1,5 @@
+import pickle
+
 import torch
 import torch.nn as nn
 from torchvision.models import resnet18
@@ -14,6 +16,7 @@ from process_data import PlantsDataset
 from utils import parse_args, confusion_matrix
 from parameters.hyperparameters import HyperParameters
 from constants import update_process_index, get_process_index
+from custom_enums import FileOption
 
 
 # FIXME: gets printed multiple times due to number of workers...4
@@ -73,6 +76,43 @@ TRAIN_PATH = None
 
 if __name__ == "__main__":
     pass
+
+
+def get_model_filename(best_acc):
+    return f'model-batch_size={BATCH_SIZE}-lr={LR}-{best_acc:.2f}.pth'
+
+
+def get_file_option_filename(file_option_enum: FileOption):
+    return file_option_enum.get_file_option_name() + f"-batch_size={BATCH_SIZE}-lr={LR}.pkl"
+
+
+def load_file_option_file(file_option_enum: FileOption):
+    file_option_enum_filename = get_file_option_filename(file_option_enum)
+
+    with open(file_option_enum_filename, 'rb') as output_file:
+        data_output = pickle.load(output_file)
+
+    return data_output
+
+
+def save_file_option_file(file_option_list: list, file_option_enum: FileOption):
+    file_option_enum_filename = get_file_option_filename(file_option_enum)
+
+    with open(file_option_enum_filename, 'wb') as output_file:
+        pickle.dump(file_option_list, output_file)
+
+
+def create_file_option_file(file_option_list: list, file_option_enum: FileOption):
+    file_option_enum_filename = get_file_option_filename(file_option_enum)
+
+    if os.path.exists(file_option_enum_filename):
+        print(f"LOADING file: {file_option_enum_filename}")
+        file_option_list = load_file_option_file(file_option_enum)
+    else:
+        print(f"CREATING file: {file_option_enum_filename}")
+        save_file_option_file(file_option_list, file_option_enum)
+
+    return file_option_list
 
 
 def load_plants_data():
@@ -135,6 +175,7 @@ def load_model(num_class):
     if PRETRAINED_MODEL is not None:
         # model.load_state_dict(torch.load(PRETRAINED_MODEL))
         print(f"loading PRETRAINED model...")
+        print(f"path: {PRETRAINED_MODEL}")
         model = torch.load(PRETRAINED_MODEL)
     else:
         # Another method
@@ -144,6 +185,13 @@ def load_model(num_class):
     return model
 
 def train(hyperparameters):
+    """
+    FIXME: deprecated...
+
+    :param hyperparameters:
+    :return:
+    """
+
     global NUM_EPOCHS
     global BATCH_SIZE
     global LR
@@ -235,6 +283,7 @@ def train_valid(hyperparameters):
     global LR
     global NUM_WORKERS
     global PRETRAINED_MODEL
+
     global TRAIN_PATH
 
     NUM_EPOCHS = hyperparameters.num_epochs
@@ -244,6 +293,16 @@ def train_valid(hyperparameters):
     PRETRAINED_MODEL = hyperparameters.pretrained_model_path
 
     TRAIN_PATH = hyperparameters.train_path
+
+    save_every_num_epoch = hyperparameters.save_every_num_epoch
+
+    # create the lists of accuracies/loss
+    for file_option in FileOption:
+        file_option_list = create_file_option_file([], file_option)
+        hyperparameters.set_accuracy_loss_dict(file_option_list, file_option)
+
+    # print out accuracy/loss for training/validation
+    hyperparameters.print_accuracy_loss_dict()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -262,6 +321,7 @@ def train_valid(hyperparameters):
     best_model_params = copy.deepcopy(model.state_dict())
 
     for epoch in range(NUM_EPOCHS):
+        print()
         print(f'Epoch: {epoch + 1}/{NUM_EPOCHS}')
         print('-' * len(f'Epoch: {epoch + 1}/{NUM_EPOCHS}'))
 
@@ -293,27 +353,47 @@ def train_valid(hyperparameters):
         training_loss = training_loss / len(train_set)
         training_acc = training_corrects / len(train_set)
 
+        # FIXME: loss is a tensor...
+        # save training accuracy/loss
+        hyperparameters.add_accuracy_loss_dict_value(FileOption.TRAINING_ACCURACY, training_acc)
+        hyperparameters.add_accuracy_loss_dict_value(FileOption.TRAINING_LOSS, training_loss.item())
+
+        print()
         print(f'Training loss: {training_loss:.4f}\t accuracy: {training_acc:.4f}\n')
 
         # validation
-        validate(model, device, valid_set, data_loader_valid)
+        validate(model, device, valid_set, data_loader_valid, hyperparameters)
 
-        if training_acc > best_acc:
-            # Delete previous modelpa
-            if os.path.isfile(f'state_dict-{best_acc:.2f}-best_train_acc.pth'):
-                os.remove(f'state_dict-{best_acc:.2f}-best_train_acc.pth')
+        # save every few epochs (speed up training)
+        if (epoch + 1) % save_every_num_epoch == 0:
+            # if training_acc > best_acc:
+
+            # Delete previous model
+            # if os.path.isfile(f'state_dict-{best_acc:.2f}-best_train_acc.pth'):
+            #     os.remove(f'state_dict-{best_acc:.2f}-best_train_acc.pth')
 
             best_acc = training_acc
             best_model_params = copy.deepcopy(model.state_dict())
 
             print(f"Epoch {epoch + 1}/{NUM_EPOCHS}: saving model acc={best_acc:.02f}...")
-            torch.save(model.state_dict(), f'state_dict-{best_acc:.2f}-best_train_acc_valid.pth')
+            # torch.save(model.state_dict(), f'state_dict-{best_acc:.2f}-best_train_acc_valid.pth')
+            # torch.save(model.state_dict(), get_model_dict_filename(best_acc))
+            torch.save(model, get_model_filename(best_acc))
 
-    model.load_state_dict(best_model_params)
     validate_final(model, device, valid_set, data_loader_valid)
 
-    print(f"FINAL saving model acc={best_acc:.02f}...")
-    torch.save(model, f'model-{best_acc:.02f}-best_train_acc_valid.pth')
+    # print out accuracy/loss for training/validation
+    hyperparameters.print_accuracy_loss_dict()
+
+    # need to SAVE the accuracy/loss for training/validation
+    for file_option in FileOption:
+        save_file_option_file(hyperparameters.get_accuracy_loss_dict_list(file_option), file_option)
+
+    # model.load_state_dict(best_model_params)
+    #
+    # print(f"FINAL saving model acc={best_acc:.02f}...")
+    # torch.save(model, f'model-{best_acc:.02f}-best_train_acc_valid.pth')
+
     return model
 
 def validate_final(model, device, valid_set, data_loader_valid):
@@ -347,7 +427,7 @@ def validate_final(model, device, valid_set, data_loader_valid):
         #submission.to_csv('submission-fake.csv', index=False)
 
 
-def validate(model, device, valid_set, data_loader_valid):
+def validate(model, device, valid_set, data_loader_valid, hyperparameters):
     model.eval()
 
     classes = [_dir.name for _dir in Path(TRAIN_PATH).glob('*')]
@@ -378,8 +458,15 @@ def validate(model, device, valid_set, data_loader_valid):
             loss = criterion(outputs, labels)
             validation_loss += loss.data * inputs.size(0)
 
+        validation_loss = validation_loss / len(valid_set)
         validation_acc = validation_corrects / len(valid_set)
 
+        # FIXME: loss is a tensor...
+        # save training accuracy/loss
+        hyperparameters.add_accuracy_loss_dict_value(FileOption.VALIDATION_ACCURACY, validation_acc)
+        hyperparameters.add_accuracy_loss_dict_value(FileOption.VALIDATION_LOSS, validation_loss.item())
+
+        print()
         print(f'Validation loss: {validation_loss:.4f}\t accuracy: {validation_acc:.4f}\n')
 
 
