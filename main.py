@@ -23,6 +23,8 @@ def get_hyperparameters():
     # get and print parameters
     # hyperparameters = HyperParameters(args, TRAIN_PATH)
 
+    # TODO: initial model number...override in file?
+
     args_get = False
     if args_get:
         # from args
@@ -32,7 +34,7 @@ def get_hyperparameters():
         # from custom values
         # pretrained_model_custom = f"model-0.96-best_train_acc.pth"
         # pretrained_model_custom = f"state_dict-batch_size=32-lr=0.0001-0.59.pth"
-        pretrained_model_custom = None
+        pretrained_model_custom = "something"
         # index_args = list(range(6))
         input_args = [1, 32, 0.0001, 4, train_path, pretrained_model_custom, save_every_num_epoch]
         index_args = list(range(len(input_args)))

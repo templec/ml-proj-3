@@ -1,4 +1,6 @@
+import glob
 import pickle
+import re
 
 import torch
 import torch.nn as nn
@@ -78,12 +80,16 @@ if __name__ == "__main__":
     pass
 
 
-def get_model_filename(best_acc):
-    return f'model-batch_size={BATCH_SIZE}-lr={LR}-{best_acc:.2f}.pth'
+def get_model_filename(best_acc, model_counter):
+    return f'model-batch_size={BATCH_SIZE}-lr={LR}-epoch={model_counter}-{best_acc:.2f}.pth'
 
 
 def get_file_option_filename(file_option_enum: FileOption):
     return file_option_enum.get_file_option_name() + f"-batch_size={BATCH_SIZE}-lr={LR}.pkl"
+
+
+def get_file_option_filename_counter():
+    return f"model-batch_size={BATCH_SIZE}-lr={LR}-counter.pkl"
 
 
 def load_file_option_file(file_option_enum: FileOption):
@@ -113,6 +119,34 @@ def create_file_option_file(file_option_list: list, file_option_enum: FileOption
         save_file_option_file(file_option_list, file_option_enum)
 
     return file_option_list
+
+def load_model_counter():
+    model_counter_filename = get_file_option_filename_counter()
+
+    with open(model_counter_filename, 'rb') as output_file:
+        data_output = pickle.load(output_file)
+
+    return data_output
+
+
+def save_model_counter(model_counter):
+    model_counter_filename = get_file_option_filename_counter()
+
+    with open(model_counter_filename, 'wb') as output_file:
+        pickle.dump(model_counter, output_file)
+
+
+def create_model_counter(model_counter):
+    model_counter_filename = get_file_option_filename_counter()
+
+    if os.path.exists(model_counter_filename):
+        print(f"LOADING file: {model_counter_filename}")
+        model_counter = load_model_counter()
+    else:
+        print(f"CREATING file: {model_counter_filename}")
+        save_model_counter(model_counter)
+
+    return model_counter
 
 
 def load_plants_data():
@@ -163,7 +197,7 @@ def load_plant_validation_data():
 
 
 # Load resnet18 pretrained model
-def load_model(num_class):
+def load_model(num_class, hyperparameters):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # ResNet
@@ -171,12 +205,35 @@ def load_model(num_class):
     #                        'resnet18', pretrained=True)
     # model.fc = nn.Linear(512, num_class)  # by Fan (Not necessary)
 
+    model_counter = hyperparameters.model_counter
+
     # if args.pretrained_model_path is not None:
-    if PRETRAINED_MODEL is not None:
+    if PRETRAINED_MODEL is not None and model_counter != 0:
         # model.load_state_dict(torch.load(PRETRAINED_MODEL))
+
+        model_filename_regex = fr"model-batch_size={BATCH_SIZE}-lr={LR}-epoch={model_counter}-*"
+        model_filenmae_list = glob.glob(model_filename_regex)
+
+        # FIXME: assume only one filename per pattern above (with epoch model number...)
+        if model_filenmae_list:
+            # FIXME: get path with model counter
+            pretrained_model_path = model_filenmae_list[0]
+        else:
+            raise Exception("NO PATH FOUND...")
+
+        # acc_pattern = \
+        #     re.compile(fr"model-batch_size={BATCH_SIZE}-lr={LR}-epoch={model_counter}-(0\.\d+)\.pth")
+        # acc_match = re.search(acc_pattern, "./")
+        #
+        # acc_filepath = acc_match.group(0)
+        # acc_num = acc_match.group(1)
+        #
+        # print(f"RE ACC GROUP 0: {acc_filepath}")
+        # print(f"RE ACC GROUP 1: {acc_num}")
+
         print(f"loading PRETRAINED model...")
-        print(f"path: {PRETRAINED_MODEL}")
-        model = torch.load(PRETRAINED_MODEL)
+        print(f"path: {pretrained_model_path}")
+        model = torch.load(pretrained_model_path)
     else:
         # Another method
         print(f"loading DEFAULT model...")
@@ -212,7 +269,7 @@ def train(hyperparameters):
     train_set, data_loader = load_plants_data()
 
 
-    model = load_model(len(train_set))
+    model = load_model(len(train_set), hyperparameters)
     model.to(device)
     # model.cuda()        # by default will send your model to the "current device"
 
@@ -304,11 +361,18 @@ def train_valid(hyperparameters):
     # print out accuracy/loss for training/validation
     hyperparameters.print_accuracy_loss_dict()
 
+    # create model counter
+    model_counter = create_model_counter(0)
+    hyperparameters.model_counter = model_counter
+
+    # print out model counter (starting epoch)
+    hyperparameters.print_model_counter()
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     train_set, valid_set, data_loader, data_loader_valid = load_plant_validation_data()
 
-    model = load_model(len(train_set))
+    model = load_model(len(train_set), hyperparameters)
     model.to(device)
     # model.cuda()        # by default will send your model to the "current device"
 
@@ -364,6 +428,10 @@ def train_valid(hyperparameters):
         # validation
         validate(model, device, valid_set, data_loader_valid, hyperparameters)
 
+        # FIXME: only at the end
+        # # increment model counter
+        # hyperparameters.increment_model_counter()
+
         # save every few epochs (speed up training)
         if (epoch + 1) % save_every_num_epoch == 0:
             # if training_acc > best_acc:
@@ -378,16 +446,28 @@ def train_valid(hyperparameters):
             print(f"Epoch {epoch + 1}/{NUM_EPOCHS}: saving model acc={best_acc:.02f}...")
             # torch.save(model.state_dict(), f'state_dict-{best_acc:.2f}-best_train_acc_valid.pth')
             # torch.save(model.state_dict(), get_model_dict_filename(best_acc))
-            torch.save(model, get_model_filename(best_acc))
+
+            model_counter = hyperparameters.model_counter
+            total_epoch = model_counter + (epoch + 1)
+            torch.save(model, get_model_filename(best_acc, total_epoch))
 
     validate_final(model, device, valid_set, data_loader_valid)
-
-    # print out accuracy/loss for training/validation
-    hyperparameters.print_accuracy_loss_dict()
 
     # need to SAVE the accuracy/loss for training/validation
     for file_option in FileOption:
         save_file_option_file(hyperparameters.get_accuracy_loss_dict_list(file_option), file_option)
+
+    # need to SAVE model counter
+    model_counter = hyperparameters.model_counter
+    total_epoch = model_counter + NUM_EPOCHS
+    hyperparameters.model_counter = total_epoch
+    save_model_counter(total_epoch)
+
+    # print out accuracy/loss for training/validation
+    hyperparameters.print_accuracy_loss_dict()
+
+    # print out model counter
+    hyperparameters.print_model_counter()
 
     # model.load_state_dict(best_model_params)
     #

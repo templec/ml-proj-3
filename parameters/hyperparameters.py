@@ -10,6 +10,7 @@ class HyperParameters():
         self.train_path = None
         self.pretrained_model_path = None
         self.save_every_num_epoch = None
+        self.model_counter = None
 
         self.accuracy_loss_dict = {}
 
@@ -17,6 +18,9 @@ class HyperParameters():
             self.get_from_args(**kwargs)
         else:
             self.get_from_custom(**kwargs)
+
+    def increment_model_counter(self):
+        self.model_counter += 1
 
     def set_accuracy_loss_dict(self, file_option_list: list, file_option: FileOption):
         self.accuracy_loss_dict[file_option] = file_option_list
@@ -82,9 +86,18 @@ class HyperParameters():
         self.save_every_num_epoch = kwargs.get("6")
 
     def print_parameters(self):
+        print(f"---------------------------------------------------")
         print(f"num epochs: {self.num_epochs}")
         print(f"batch size: {self.batch_size}")
         print(f"learning rate: {self.lr}")
         print(f"num workers: {self.num_workers}")
         print(f"training path: {self.train_path}")
         print(f"pretrained model path: {self.pretrained_model_path}")
+        print(f"save model every few epoch: {self.save_every_num_epoch}")
+        print(f"epoch model counter: {self.model_counter}")
+        print(f"---------------------------------------------------")
+
+    def print_model_counter(self):
+        print(f"---------------------------------------------------")
+        print(f"epoch starting model counter: {self.model_counter}")
+        print(f"---------------------------------------------------")
