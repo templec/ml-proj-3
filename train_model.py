@@ -4,6 +4,7 @@ import re
 
 import torch
 import torch.nn as nn
+from matplotlib import pyplot as plt
 from torchvision.models import resnet18
 # from torch.autograd import Variable
 from torch.utils.data import DataLoader
@@ -82,6 +83,11 @@ if __name__ == "__main__":
 
 def get_model_filename(best_acc, model_counter):
     return f'model-batch_size={BATCH_SIZE}-lr={LR}-epoch={model_counter}-{best_acc:.2f}.pth'
+
+
+def get_model_plot_filename(model_counter, prefix):
+    return f'{prefix}' \
+           f'-batch_size={BATCH_SIZE}-lr={LR}-epoch={model_counter}.png'
 
 
 def get_file_option_filename(file_option_enum: FileOption):
@@ -334,7 +340,7 @@ def train(hyperparameters):
 
     return model
 
-def train_valid(hyperparameters):
+def train_valid(hyperparameters, train=True, plot=True):
     global NUM_EPOCHS
     global BATCH_SIZE
     global LR
@@ -368,106 +374,113 @@ def train_valid(hyperparameters):
     # print out model counter (starting epoch)
     hyperparameters.print_model_counter()
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = None
 
-    train_set, valid_set, data_loader, data_loader_valid = load_plant_validation_data()
+    if train:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = load_model(len(train_set), hyperparameters)
-    model.to(device)
-    # model.cuda()        # by default will send your model to the "current device"
+        train_set, valid_set, data_loader, data_loader_valid = load_plant_validation_data()
 
-   
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    criterion = nn.CrossEntropyLoss()
+        model = load_model(len(train_set), hyperparameters)
+        model.to(device)
+        # model.cuda()        # by default will send your model to the "current device"
 
-    best_acc = 0.0
-    
-    best_model_params = copy.deepcopy(model.state_dict())
 
-    for epoch in range(NUM_EPOCHS):
-        print()
-        print(f'Epoch: {epoch + 1}/{NUM_EPOCHS}')
-        print('-' * len(f'Epoch: {epoch + 1}/{NUM_EPOCHS}'))
+        optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+        criterion = nn.CrossEntropyLoss()
 
-        training_loss = 0.0
-        training_corrects = 0
-        
-        for i, (inputs, labels) in enumerate(tqdm(data_loader)):
-            # Method 1
-            # inputs = Variable(inputs.cuda())
-            # labels = Variable(labels.cuda())
+        best_acc = 0.0
 
-            # Method 2
-            inputs, labels = inputs.to(device), labels.to(device)
-            #print("inputs: {}".format(inputs))
-            #print("labels: {}".format(labels))
-            outputs = model(inputs)         # Resnet18 output
-            #print("outputs: {}".format(outputs))
-            _, preds = torch.max(outputs.data, 1)   
-            #print("preds: {}".format(preds))
-            loss = criterion(outputs, labels) 
+        best_model_params = copy.deepcopy(model.state_dict())
 
-            optimizer.zero_grad()
-            loss.backward() 
-            optimizer.step() 
+        for epoch in range(NUM_EPOCHS):
+            print()
+            print(f'Epoch: {epoch + 1}/{NUM_EPOCHS}')
+            print('-' * len(f'Epoch: {epoch + 1}/{NUM_EPOCHS}'))
 
-            training_loss += loss.data * inputs.size(0)
-            training_corrects += (preds == labels.data).sum().item() 
+            training_loss = 0.0
+            training_corrects = 0
 
-        training_loss = training_loss / len(train_set)
-        training_acc = training_corrects / len(train_set)
+            for i, (inputs, labels) in enumerate(tqdm(data_loader)):
+                # Method 1
+                # inputs = Variable(inputs.cuda())
+                # labels = Variable(labels.cuda())
 
-        # FIXME: loss is a tensor...
-        # save training accuracy/loss
-        hyperparameters.add_accuracy_loss_dict_value(FileOption.TRAINING_ACCURACY, training_acc)
-        hyperparameters.add_accuracy_loss_dict_value(FileOption.TRAINING_LOSS, training_loss.item())
+                # Method 2
+                inputs, labels = inputs.to(device), labels.to(device)
+                #print("inputs: {}".format(inputs))
+                #print("labels: {}".format(labels))
+                outputs = model(inputs)         # Resnet18 output
+                #print("outputs: {}".format(outputs))
+                _, preds = torch.max(outputs.data, 1)
+                #print("preds: {}".format(preds))
+                loss = criterion(outputs, labels)
 
-        print()
-        print(f'Training loss: {training_loss:.4f}\t accuracy: {training_acc:.4f}\n')
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-        # validation
-        validate(model, device, valid_set, data_loader_valid, hyperparameters)
+                training_loss += loss.data * inputs.size(0)
+                training_corrects += (preds == labels.data).sum().item()
 
-        # FIXME: only at the end
-        # # increment model counter
-        # hyperparameters.increment_model_counter()
+            training_loss = training_loss / len(train_set)
+            training_acc = training_corrects / len(train_set)
 
-        # save every few epochs (speed up training)
-        if (epoch + 1) % save_every_num_epoch == 0:
-            # if training_acc > best_acc:
+            # FIXME: loss is a tensor...
+            # save training accuracy/loss
+            hyperparameters.add_accuracy_loss_dict_value(FileOption.TRAINING_ACCURACY, training_acc)
+            hyperparameters.add_accuracy_loss_dict_value(FileOption.TRAINING_LOSS, training_loss.item())
 
-            # Delete previous model
-            # if os.path.isfile(f'state_dict-{best_acc:.2f}-best_train_acc.pth'):
-            #     os.remove(f'state_dict-{best_acc:.2f}-best_train_acc.pth')
+            print()
+            print(f'Training loss: {training_loss:.4f}\t accuracy: {training_acc:.4f}\n')
 
-            best_acc = training_acc
-            best_model_params = copy.deepcopy(model.state_dict())
+            # validation
+            validate(model, device, valid_set, data_loader_valid, hyperparameters)
 
-            print(f"Epoch {epoch + 1}/{NUM_EPOCHS}: saving model acc={best_acc:.02f}...")
-            # torch.save(model.state_dict(), f'state_dict-{best_acc:.2f}-best_train_acc_valid.pth')
-            # torch.save(model.state_dict(), get_model_dict_filename(best_acc))
+            # FIXME: only at the end
+            # # increment model counter
+            # hyperparameters.increment_model_counter()
 
-            model_counter = hyperparameters.model_counter
-            total_epoch = model_counter + (epoch + 1)
-            torch.save(model, get_model_filename(best_acc, total_epoch))
+            # save every few epochs (speed up training)
+            if (epoch + 1) % save_every_num_epoch == 0:
+                # if training_acc > best_acc:
 
-    validate_final(model, device, valid_set, data_loader_valid)
+                # Delete previous model
+                # if os.path.isfile(f'state_dict-{best_acc:.2f}-best_train_acc.pth'):
+                #     os.remove(f'state_dict-{best_acc:.2f}-best_train_acc.pth')
 
-    # need to SAVE the accuracy/loss for training/validation
-    for file_option in FileOption:
-        save_file_option_file(hyperparameters.get_accuracy_loss_dict_list(file_option), file_option)
+                best_acc = training_acc
+                best_model_params = copy.deepcopy(model.state_dict())
 
-    # need to SAVE model counter
-    model_counter = hyperparameters.model_counter
-    total_epoch = model_counter + NUM_EPOCHS
-    hyperparameters.model_counter = total_epoch
-    save_model_counter(total_epoch)
+                print(f"Epoch {epoch + 1}/{NUM_EPOCHS}: saving model acc={best_acc:.02f}...")
+                # torch.save(model.state_dict(), f'state_dict-{best_acc:.2f}-best_train_acc_valid.pth')
+                # torch.save(model.state_dict(), get_model_dict_filename(best_acc))
 
-    # print out accuracy/loss for training/validation
-    hyperparameters.print_accuracy_loss_dict()
+                model_counter = hyperparameters.model_counter
+                total_epoch = model_counter + (epoch + 1)
+                torch.save(model, get_model_filename(best_acc, total_epoch))
 
-    # print out model counter
-    hyperparameters.print_model_counter()
+        validate_final(model, device, valid_set, data_loader_valid)
+
+        # need to SAVE the accuracy/loss for training/validation
+        for file_option in FileOption:
+            save_file_option_file(hyperparameters.get_accuracy_loss_dict_list(file_option), file_option)
+
+        # need to SAVE model counter
+        model_counter = hyperparameters.model_counter
+        total_epoch = model_counter + NUM_EPOCHS
+        hyperparameters.model_counter = total_epoch
+        save_model_counter(total_epoch)
+
+        # print out accuracy/loss for training/validation
+        hyperparameters.print_accuracy_loss_dict()
+
+        # print out model counter
+        hyperparameters.print_model_counter()
+
+    if plot:
+        # plot the accuracy/loss
+        plot_accuracy_loss(hyperparameters)
 
     # model.load_state_dict(best_model_params)
     #
@@ -505,6 +518,63 @@ def validate_final(model, device, valid_set, data_loader_valid):
     calc_class = np.array(calc_class_lst)
     confusion_matrix(calc_class, real_class)
         #submission.to_csv('submission-fake.csv', index=False)
+
+
+def plot_accuracy_loss(hyperparameters: HyperParameters):
+    plots_dir = "plots"
+
+    if not os.path.exists(plots_dir):
+        os.makedirs(plots_dir)
+
+    model_counter = hyperparameters.model_counter
+
+    # plot accuracy
+    fig, ax = plt.subplots()
+
+    file_option = FileOption.TRAINING_ACCURACY
+    file_option_list = hyperparameters.get_accuracy_loss_dict_list(file_option)
+    plt.plot(list(range(len(file_option_list))), file_option_list, '.--', label=file_option.get_file_option_name())
+
+    file_option = FileOption.VALIDATION_ACCURACY
+    file_option_list = hyperparameters.get_accuracy_loss_dict_list(file_option)
+    plt.plot(list(range(len(file_option_list))), file_option_list, '.--', label=file_option.get_file_option_name())
+
+    plt.xlabel(f"Epoch number")
+    plt.ylabel(f"Accuracy")
+    plt.title(f"Model Accuracy, batch size={BATCH_SIZE}, lr={LR}, epochs={model_counter}")
+
+    plt.legend()
+    plt.grid(True)
+
+    # FIXME: need integers on x-axis...float otherwise
+    ax.locator_params(integer=True)
+
+    accuracy_plot_filename = get_model_plot_filename(model_counter, "accuracy")
+    plt.savefig(f"{plots_dir}/{accuracy_plot_filename}", bbox_inches="tight")
+
+    # plot loss
+    fig, ax = plt.subplots()
+
+    file_option = FileOption.TRAINING_LOSS
+    file_option_list = hyperparameters.get_accuracy_loss_dict_list(file_option)
+    plt.plot(list(range(len(file_option_list))), file_option_list, '.--', label=file_option.get_file_option_name())
+
+    file_option = FileOption.VALIDATION_LOSS
+    file_option_list = hyperparameters.get_accuracy_loss_dict_list(file_option)
+    plt.plot(list(range(len(file_option_list))), file_option_list, '.--', label=file_option.get_file_option_name())
+
+    plt.xlabel(f"Epoch number")
+    plt.ylabel(f"Loss")
+    plt.title(f"Model Loss, batch size={BATCH_SIZE}, lr={LR}, epochs={model_counter}")
+
+    plt.legend()
+    plt.grid(True)
+
+    # FIXME: need integers on x-axis...float otherwise
+    ax.locator_params(integer=True)
+
+    loss_plot_filename = get_model_plot_filename(model_counter, "loss")
+    plt.savefig(f"{plots_dir}/{loss_plot_filename}", bbox_inches="tight")
 
 
 def validate(model, device, valid_set, data_loader_valid, hyperparameters):

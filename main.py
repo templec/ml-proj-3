@@ -9,9 +9,11 @@ def main(hyperparameters):
     test(model)
 
 
-def main_new(hyperparameters):
-    model = train_valid(hyperparameters)
-    test(model)
+def main_new(hyperparameters, train=True, plot=True):
+    model = train_valid(hyperparameters, train=train, plot=plot)
+
+    if train:
+        test(model)
 
 
 def get_hyperparameters():
@@ -69,4 +71,4 @@ def get_hyperparameters():
 if __name__ == '__main__':
     hyperparameters = get_hyperparameters()
     # main(hyperparameters)
-    main_new(hyperparameters)
+    main_new(hyperparameters, train=False)
