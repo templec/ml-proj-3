@@ -24,6 +24,9 @@ def parse_args():
 def confusion_matrix(calc_class, real_class):
 
     conf_matrix = np.zeros((12, 12), dtype=np.int32)
+    plant_groups = ["Black-grass", "Charlock", "Cleavers", "Common Chickweed", "Common wheat", "Fat Hen",
+                    "Loose Silky-bent", "Maize", "Scentless Mayweed", "Shepherds Purse", "Small-flowered Cransebill",
+                    "Sugar beet"]
 
     for row in range(12):
         for col in range(12):
@@ -38,5 +41,6 @@ def confusion_matrix(calc_class, real_class):
     ax = fig.add_subplot(1,1,1)
     ax.set_title("Confusion Matrix")
 
-    seaborn.heatmap(conf_matrix, annot=True, fmt=".0f")#, xticklabels=news_groups, yticklabels=news_groups) # plot
+    seaborn.heatmap(conf_matrix, annot=True, fmt=".0f", xticklabels=plant_groups, yticklabels=plant_groups)
+     # plot
     plt.show()
